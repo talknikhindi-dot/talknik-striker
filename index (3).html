@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Talknik Striker - English Edition</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700&display=swap');
+        
+        body { 
+            margin: 0; 
+            background: #ffffff; 
+            overflow: hidden; 
+            font-family: 'Poppins', sans-serif; 
+            touch-action: none; 
+        }
+        
+        canvas { 
+            display: block; 
+            width: 100vw; 
+            height: 100vh; 
+            background: radial-gradient(circle, #ffffff 0%, #f2f2f2 100%); 
+        }
+
+        #ui-layer {
+            position: absolute; 
+            top: 20px; 
+            left: 20px;
+            padding: 12px 25px; 
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50px; 
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            z-index: 10; 
+            font-weight: bold; 
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        #start-screen {
+            position: absolute; 
+            inset: 0; 
+            background: #ffffff;
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center;
+            z-index: 200;
+        }
+
+        .play-btn {
+            padding: 18px 60px; 
+            background: #ff0080; 
+            color: white;
+            border-radius: 50px; 
+            cursor: pointer; 
+            border: none;
+            font-size: 1.6rem; 
+            font-weight: bold; 
+            transition: 0.3s;
+            box-shadow: 0 10px 25px rgba(255, 0, 128, 0.3);
+        }
+
+        .play-btn:hover { 
+            transform: scale(1.05); 
+            background: #e60073; 
+        }
+
+        h1 {
+            font-size: clamp(2rem, 10vw, 4rem);
+            color: #333;
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="start-screen">
+    <h1>TALKNIK STRIKER</h1>
+    <button class="play-btn" onclick="startGame()">START GAME</button>
+</div>
+
+<div id="ui-layer">
+    SCORE: <span id="score" style="color: #ff0080;">0</span> | HP: <span id="hp" style="color: #40e0d0;">100</span>%
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let score = 0, hp = 100, active = false;
+let enemies = [], projectiles = [];
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+function startGame() {
+    document.getElementById('start-screen').style.display = 'none';
+    active = true;
+    spawn();
+    animate();
+}
+
+// Fixed Shooting Logic for better accuracy
+function fire(clientX, clientY) {
+    if(!active) return;
+    const originX = 100;
+    const originY = canvas.height / 2;
+    const angle = Math.atan2(clientY - originY, clientX - originX);
+    
+    projectiles.push({
+        x: originX,
+        y: originY,
+        vx: Math.cos(angle) * 15, // Speed of bullet
+        vy: Math.sin(angle) * 15
+    });
+}
+
+window.addEventListener('mousedown', (e) => fire(e.clientX, e.clientY));
+window.addEventListener('touchstart', (e) => {
+    const touch = e.touches[0];
+    fire(touch.clientX, touch.clientY);
+});
+
+function spawn() {
+    if(!active) return;
+    enemies.push({
+        x: canvas.width + 50,
+        y: Math.random() * (canvas.height - 150) + 75,
+        r: 20 + Math.random() * 10,
+        s: 3 + (score / 300)
+    });
+    setTimeout(spawn, Math.max(600, 1500 - score/5));
+}
+
+function animate() {
+    if(!active) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Player (Striker)
+    ctx.fillStyle = '#ff0080';
+    ctx.beginPath(); 
+    ctx.arc(100, canvas.height/2, 28, 0, Math.PI*2); 
+    ctx.fill();
+
+    // Bullet movement and cleanup
+    projectiles.forEach((p, pi) => {
+        p.x += p.vx;
+        p.y += p.vy;
+        
+        ctx.fillStyle = '#40e0d0';
+        ctx.beginPath(); 
+        ctx.arc(p.x, p.y, 6, 0, Math.PI*2); 
+        ctx.fill();
+        
+        if(p.x > canvas.width || p.x < 0 || p.y < 0 || p.y > canvas.height) {
+            projectiles.splice(pi, 1);
+        }
+    });
+
+    // Enemy movement and Collision Detection
+    enemies.forEach((en, ei) => {
+        en.x -= en.s;
+        
+        ctx.fillStyle = '#2d3436';
+        ctx.beginPath(); 
+        ctx.arc(en.x, en.y, en.r, 0, Math.PI*2); 
+        ctx.fill();
+
+        // Check if bullet hits enemy
+        projectiles.forEach((p, pi) => {
+            const dist = Math.hypot(en.x - p.x, en.y - p.y);
+            if(dist < en.r + 6) { 
+                enemies.splice(ei, 1);
+                projectiles.splice(pi, 1);
+                score += 10;
+                document.getElementById('score').innerText = score;
+            }
+        });
+
+        // Life loss if enemy passes player
+        if(en.x < -50) {
+            enemies.splice(ei, 1);
+            hp -= 10;
+            document.getElementById('hp').innerText = hp;
+            if(hp <= 0) {
+                active = false;
+                alert("GAME OVER\nFinal Score: " + score);
+                location.reload();
+            }
+        }
+    });
+
+    requestAnimationFrame(animate);
+}
+</script>
+</body>
+</html>
